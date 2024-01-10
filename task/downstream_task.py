@@ -3,19 +3,18 @@ import numpy as np
 from datasets import load_dataset
 from sklearn.metrics import matthews_corrcoef
 from transformers import TrainingArguments, EarlyStoppingCallback
-from trainer import DownstreamTrainer
-
 from metric import f1_max, area_under_prc, spearmanr
 from model.protein_encoder.builder import build_protein_encoder
 from model.task_model.downstream_model import EsmForSequenceClassification
-from utils import EvaluateCallback
+from trainer.downstream_trainer import DownstreamTrainer
+
 
 
 class DownstreamTask(object):
-    def __init__(self, config):
-        self.config = config
-        self.num_labels = config.num_labels
-        self.protein_encoder = build_protein_encoder(config)
+    def __init__(self, run_config):
+        self.run_config = run_config
+        self.num_labels = run_config.num_labels
+        self.protein_encoder = build_protein_encoder(run_config)
         self.task_model = self.build_task_model()
         self.dataset = self.build_dataset()
         self.train_args = self.build_train_args()
@@ -26,15 +25,16 @@ class DownstreamTask(object):
 
     def build_dataset(self):
         def preprocess_function(examples):
-            tokenized_examples = self.protein_encoder.tokenizer(examples["seq"], truncation=True, padding=True,
-                                                                max_length=self.config.max_length)
+            tokenized_examples = self.protein_encoder.tokenizer(examples["seq"], truncation=True,
+                                                                        padding="max_length",
+                                                                        max_length=self.run_config.max_length)
             tokenized_examples['label'] = torch.tensor(examples['label'])
             return tokenized_examples
 
         dataset = load_dataset("json", data_files={
-            'train': f'{self.config.data_path}/{self.config.dataset}/train.json',
-            'valid': f'{self.config.data_path}/{self.config.dataset}/valid.json',
-            'test': f'{self.config.data_path}/{self.config.dataset}/test.json',
+            'train': f'{self.run_config.data_path}/{self.run_config.dataset}/train.json',
+            'valid': f'{self.run_config.data_path}/{self.run_config.dataset}/valid.json',
+            'test': f'{self.run_config.data_path}/{self.run_config.dataset}/test.json',
         })
         dataset = dataset.map(preprocess_function, batched=True)
         dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
@@ -42,25 +42,25 @@ class DownstreamTask(object):
 
     def build_train_args(self):
         return TrainingArguments(
-            output_dir=self.config.output_path,
+            output_dir=self.run_config.output_path,
             evaluation_strategy="epoch",
             save_strategy="epoch",
             logging_strategy="epoch",
-            per_device_train_batch_size=self.config.batch_size,
-            per_device_eval_batch_size=self.config.batch_size,
-            num_train_epochs=self.config.num_epochs,
-            weight_decay=self.config.weight_decay,
+            per_device_train_batch_size=self.run_config.batch_size,
+            per_device_eval_batch_size=self.run_config.batch_size,
+            num_train_epochs=self.run_config.num_epochs,
+            weight_decay=self.run_config.weight_decay,
             load_best_model_at_end=True,
-            metric_for_best_model=self.config.metric_for_best_model,
-            greater_is_better=False if self.config.metric_for_best_model in ['mae', 'rmse'] else True,
-            fp16=self.config.fp16,
+            metric_for_best_model=self.run_config.metric_for_best_model,
+            greater_is_better=False if self.run_config.metric_for_best_model in ['mae', 'rmse'] else True,
+            fp16=self.run_config.fp16,
             push_to_hub=False,
             report_to=["wandb"],
         )
 
     def build_trainer(self):
         trainer = DownstreamTrainer(
-            config=self.config,
+            run_config=self.run_config,
             model=self.task_model,
             args=self.train_args,
             train_dataset=self.dataset["train"],
@@ -68,7 +68,6 @@ class DownstreamTask(object):
             compute_metrics=self.compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
         )
-        trainer.add_callback(EvaluateCallback(trainer, self.dataset["test"]))
         return trainer
 
     def compute_metrics(self, eval_pred):
@@ -80,8 +79,8 @@ class DownstreamTask(object):
 
 
 class SingleLabelSequenceClassificationTask(DownstreamTask):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, run_config):
+        super().__init__(run_config)
 
     def build_task_model(self):
         model_config = self.protein_encoder.model_config
@@ -100,8 +99,8 @@ class SingleLabelSequenceClassificationTask(DownstreamTask):
 
 
 class MultiLabelSequenceClassificationTask(SingleLabelSequenceClassificationTask):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, run_config):
+        super().__init__(run_config)
 
     def build_trainer(self):
         def collate_fn(examples):
@@ -115,7 +114,7 @@ class MultiLabelSequenceClassificationTask(SingleLabelSequenceClassificationTask
             }
 
         trainer = DownstreamTrainer(
-            config=self.config,
+            run_config=self.run_config,
             model=self.task_model,
             args=self.train_args,
             train_dataset=self.dataset["train"],
@@ -124,7 +123,6 @@ class MultiLabelSequenceClassificationTask(SingleLabelSequenceClassificationTask
             data_collator=collate_fn,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
         )
-        trainer.add_callback(EvaluateCallback(trainer, self.dataset["test"]))
         return trainer
 
     def compute_metrics(self, eval_pred):
@@ -137,8 +135,8 @@ class MultiLabelSequenceClassificationTask(SingleLabelSequenceClassificationTask
 
 
 class SequenceRegressionTask(SingleLabelSequenceClassificationTask):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, run_config):
+        super().__init__(run_config)
 
     def compute_metrics(self, eval_pred):
         predictions, labels = eval_pred

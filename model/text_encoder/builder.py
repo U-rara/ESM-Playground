@@ -1,7 +1,7 @@
 from .bert_encoder import BertEncoder
 
 
-def build_test_encoder(config):
+def build_text_encoder(config):
     text_model_name = config.text_model_name
     if 'BERT' in text_model_name:
         return BertEncoder(config)

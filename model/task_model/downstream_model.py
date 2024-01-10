@@ -12,11 +12,11 @@ from transformers.utils import add_start_docstrings_to_model_forward
 class EsmClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
 
-    def __init__(self, config):
+    def __init__(self, run_config):
         super().__init__()
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
+        self.dense = nn.Linear(run_config.hidden_size, run_config.hidden_size)
+        self.dropout = nn.Dropout(run_config.hidden_dropout_prob)
+        self.out_proj = nn.Linear(run_config.hidden_size, run_config.num_labels)
 
     def forward(self, features, **kwargs):
         x = features.mean(dim=1)
