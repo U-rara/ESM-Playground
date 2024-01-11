@@ -4,10 +4,9 @@ from datasets import load_dataset
 from sklearn.metrics import matthews_corrcoef
 from transformers import TrainingArguments, EarlyStoppingCallback
 from metric import f1_max, area_under_prc, spearmanr
+from model.downstream_model import EsmForSequenceClassification
 from model.protein_encoder.builder import build_protein_encoder
-from model.task_model.downstream_model import EsmForSequenceClassification
 from trainer.downstream_trainer import DownstreamTrainer
-
 
 
 class DownstreamTask(object):
@@ -26,8 +25,8 @@ class DownstreamTask(object):
     def build_dataset(self):
         def preprocess_function(examples):
             tokenized_examples = self.protein_encoder.tokenizer(examples["seq"], truncation=True,
-                                                                        padding="max_length",
-                                                                        max_length=self.run_config.max_length)
+                                                                padding="max_length",
+                                                                max_length=self.run_config.max_length)
             tokenized_examples['label'] = torch.tensor(examples['label'])
             return tokenized_examples
 
@@ -55,6 +54,7 @@ class DownstreamTask(object):
             greater_is_better=False if self.run_config.metric_for_best_model in ['mae', 'rmse'] else True,
             fp16=self.run_config.fp16,
             push_to_hub=False,
+            save_total_limit=1,
             report_to=["wandb"],
         )
 

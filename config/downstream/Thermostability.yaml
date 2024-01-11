@@ -2,7 +2,7 @@ hydra:
   run:
     dir: './outputs/${task_name}/${now:%Y-%m-%d_%H-%M-%S}'
 
-task_name: 'esm2_t12_650M_UR50D_Thermostability'
+task_name: 'esm2_t33_650M_UR50D_Thermostability'
 
 # path
 data_path: './database'

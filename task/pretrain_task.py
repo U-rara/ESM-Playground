@@ -1,11 +1,11 @@
-import torch
 from datasets import load_dataset
 from transformers import TrainingArguments, EarlyStoppingCallback
 
+from model.pretrain_model import ProteinTextCLIPForPretrain, ProtSTForPretrain
 from model.protein_encoder.builder import build_protein_encoder
-from model.task_model.pretrain_model import ProteinTextCLIPForPretrain
 from model.text_encoder.builder import build_text_encoder
 from trainer.pretrain_trainer import CLIPPretrainTrainer
+from utils import DataCollatorForProteinTextCLIPPretrain
 
 
 class PretrainTask(object):
@@ -43,12 +43,11 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
 
     def build_dataset(self):
         def preprocess_function(examples):
-            protein_tokenized_examples = self.protein_encoder.tokenizer(examples["seq"], truncation=True,
-                                                                        padding="max_length",
-                                                                        max_length=self.run_config.max_length)
-            text_tokenized_examples = self.text_encoder.tokenizer(examples["text"], truncation=True,
-                                                                  padding="max_length",
-                                                                  max_length=512)
+            protein_tokenized_examples = self.protein_encoder.tokenizer(examples["seq"],
+                                                                        max_length=self.run_config.max_length,
+                                                                        truncation=True, padding=False)
+            text_tokenized_examples = self.text_encoder.tokenizer(examples["text"], max_length=512,
+                                                                  truncation=True, padding=False)
             return {
                 'protein_input_ids': protein_tokenized_examples['input_ids'],
                 'protein_attention_mask': protein_tokenized_examples['attention_mask'],
@@ -70,7 +69,7 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
             output_dir=self.run_config.output_path,
             evaluation_strategy="epoch",
             save_strategy="epoch",
-            logging_strategy="step",
+            logging_strategy="steps",
             per_device_train_batch_size=self.run_config.batch_size,
             per_device_eval_batch_size=self.run_config.batch_size,
             num_train_epochs=self.run_config.num_epochs,
@@ -84,20 +83,20 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
         )
 
     def build_trainer(self):
-        def collate_fn(batch):
-            return {
-                'protein_input_ids': torch.stack([example['protein_input_ids'] for example in batch]),
-                'protein_attention_mask': torch.stack([example['protein_attention_mask'] for example in batch]),
-                'text_input_ids': torch.stack([example['text_input_ids'] for example in batch]),
-                'text_attention_mask': torch.stack([example['text_attention_mask'] for example in batch]),
-            }
-
         return CLIPPretrainTrainer(
             run_config=self.run_config,
             model=self.task_model,
             args=self.train_args,
-            data_collator=collate_fn,
+            data_collator=DataCollatorForProteinTextCLIPPretrain(self.protein_encoder.tokenizer,
+                                                                 self.text_encoder.tokenizer,
+                                                                 mlm_probability=getattr(self.run_config,
+                                                                                         "mlm_probability", 0.0)),
             train_dataset=self.dataset["train"],
             eval_dataset=self.dataset["valid"],
             callbacks=[EarlyStoppingCallback(early_stopping_patience=4)]
         )
+
+
+class ProtSTPretrainTask(ProteinTextCLIPPretrainTask):
+    def build_task_model(self):
+        return ProtSTForPretrain(self.run_config, self.protein_encoder, self.text_encoder)

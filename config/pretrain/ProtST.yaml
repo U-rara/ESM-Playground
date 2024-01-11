@@ -9,9 +9,9 @@ data_path: './database'
 output_path: './outputs/${task_name}/${now:%Y-%m-%d_%H-%M-%S}'
 
 # model
-protein_model_name: '/root/tmp/ww/model/esm2_t33_650M_UR50D'
+protein_model_name: '/root/model/esm2_t33_650M_UR50D'
 protein_model_fixed: False
-text_model_name: '/root/tmp/ww/model/BiomedNLP-PubMedBERT-base-uncased-abstract'
+text_model_name: '/root/model/BiomedNLP-PubMedBERT-base-uncased-abstract'
 text_model_fixed: True
 projection_dim: 512
 fusion_num_heads: 8
