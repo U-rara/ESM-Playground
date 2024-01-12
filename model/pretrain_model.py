@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import cross_entropy
 from transformers import PreTrainedModel, PretrainedConfig, AutoConfig, AutoModel
-from model.layers import CrossAttention, MLP
+
+from model.layers import CrossAttention
 
 
 def contrastive_loss(logits: torch.Tensor) -> torch.Tensor:
@@ -155,17 +156,36 @@ class ProtSTForPretrain(PreTrainedModel):
 
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / self.config.logit_scale_init))
 
-        self.mlm_head = MLP(self.config.projection_dim, self.config.projection_dim,
-                            protein_model_config.vocab_size, self.config.mlp_num_layers)
+        self.mlm_head = nn.Sequential(
+            nn.Linear(protein_model_config.hidden_size, self.config.projection_dim),
+            nn.GELU(),
+            nn.LayerNorm(self.config.projection_dim),
+            nn.Linear(self.config.projection_dim, protein_model_config.vocab_size),
+        )
+
         self.fusion_model = CrossAttention(
             hidden_dim=self.config.projection_dim,
             num_layers=self.config.fusion_num_layers,
             num_heads=self.config.fusion_num_heads,
             batch_norm=self.config.fusion_batch_norm)
-        self.mmp_protein_head = MLP(self.config.projection_dim, self.config.projection_dim,
-                                    protein_model_config.vocab_size, self.config.mlp_num_layers)
-        self.mmp_text_head = MLP(self.config.projection_dim, self.config.projection_dim,
-                                 text_model_config.vocab_size, self.config.mlp_num_layers)
+
+        self.mmp_protein_head = nn.Sequential(
+            nn.Linear(self.config.projection_dim, self.config.projection_dim),
+            nn.GELU(),
+            nn.LayerNorm(self.config.projection_dim),
+            nn.Linear(self.config.projection_dim, protein_model_config.vocab_size),
+        )
+        self.mmp_text_head = nn.Sequential(
+            nn.Linear(self.config.projection_dim, self.config.projection_dim),
+            nn.GELU(),
+            nn.LayerNorm(self.config.projection_dim),
+            nn.Linear(self.config.projection_dim, text_model_config.vocab_size),
+        )
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            if module.bias is not None:
+                module.bias.data.zero_()
 
     def forward(self,
                 protein_input_ids,
@@ -204,18 +224,18 @@ class ProtSTForPretrain(PreTrainedModel):
         # compute outputs
         protein_outputs = self.protein_model(input_ids=protein_masked_input_ids,
                                              attention_mask=protein_attention_mask).last_hidden_state
-        protein_outputs = self.protein_projection(protein_outputs)
-        text_outputs = self.text_model(input_ids=text_masked_input_ids,
-                                       attention_mask=text_attention_mask).last_hidden_state
-        text_outputs = self.text_projection(text_outputs)
-        fusion_outputs = self.fusion_model(protein_outputs, protein_attention_mask, text_outputs, text_attention_mask)
-
         # compute the mlm loss
         protein_mlm_logits = self.mlm_head(protein_outputs)
         protein_mlm_loss = cross_entropy(protein_mlm_logits.view(-1, protein_mlm_logits.shape[-1]),
                                          protein_masked_labels.view(-1))
 
         # compute the mmp loss
+        protein_outputs = self.protein_projection(protein_outputs)
+        text_outputs = self.text_model(input_ids=text_masked_input_ids,
+                                       attention_mask=text_attention_mask).last_hidden_state
+        text_outputs = self.text_projection(text_outputs)
+        fusion_outputs = self.fusion_model(protein_outputs, protein_attention_mask, text_outputs, text_attention_mask)
+
         protein_mmp_logits = self.mmp_protein_head(fusion_outputs['protein_output'])
         protein_mmp_loss = cross_entropy(protein_mmp_logits.view(-1, protein_mmp_logits.shape[-1]),
                                          protein_masked_labels.view(-1))
@@ -223,6 +243,8 @@ class ProtSTForPretrain(PreTrainedModel):
         text_mmp_loss = cross_entropy(text_mmp_logits.view(-1, text_mmp_logits.shape[-1]),
                                       text_masked_labels.view(-1))
 
+        print(f"cl_loss: {cl_loss.item()}, protein_mlm_loss: {protein_mlm_loss.item()}, "
+              f"protein_mmp_loss: {protein_mmp_loss.item()}, text_mmp_loss: {text_mmp_loss.item()}")
         return {
             "loss": cl_loss + protein_mlm_loss + protein_mmp_loss + text_mmp_loss,
             "cl_loss": cl_loss,

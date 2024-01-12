@@ -2,29 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-
-class MLP(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
-        super(MLP, self).__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.num_layers = num_layers
-
-        layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]  # Input layer
-        for _ in range(num_layers - 2):  # Add hidden layers
-            layers.extend([nn.Linear(hidden_dim, hidden_dim), nn.ReLU()])
-        layers.append(nn.Linear(hidden_dim, output_dim))  # Output layer
-
-        # ModuleList to hold all layers
-        self.layers = nn.ModuleList(layers)
-
-    def forward(self, x):
-        for layer in self.layers:
-            x = layer(x)
-        return x
-
-
 class CrossAttentionBlock(nn.Module):
 
     def __init__(self, hidden_dim, num_heads):
@@ -45,7 +22,7 @@ class CrossAttentionBlock(nn.Module):
         self.key2 = nn.Linear(hidden_dim, hidden_dim, bias=False)
         self.value2 = nn.Linear(hidden_dim, hidden_dim, bias=False)
 
-    def _alpha_from_logits(self, logits, mask_row, mask_col, inf=1e6):
+    def _alpha_from_logits(self, logits, mask_row, mask_col, inf=1e4):
         N, L1, L2, H = logits.shape
         mask_row = mask_row.view(N, L1, 1).repeat(1, 1, H)
         mask_col = mask_col.view(N, L2, 1).repeat(1, 1, H)

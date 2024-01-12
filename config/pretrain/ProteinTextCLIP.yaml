@@ -26,6 +26,7 @@ fp16: True
 batch_size: 3
 num_epochs: 35
 weight_decay: 0.0
+warmup_ratio: 0.03
 
 # eval
 metric_for_best_model: 'loss'

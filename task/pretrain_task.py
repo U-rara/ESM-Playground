@@ -74,6 +74,7 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
             evaluation_strategy="epoch",
             save_strategy="epoch",
             logging_strategy="steps",
+            logging_steps=200,
             per_device_train_batch_size=self.run_config.batch_size,
             per_device_eval_batch_size=self.run_config.batch_size,
             num_train_epochs=self.run_config.num_epochs,
@@ -85,6 +86,7 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
             push_to_hub=False,
             learning_rate=self.run_config.lr,
             report_to=["wandb"],
+            warmup_ratio=self.run_config.warmup_ratio,
         )
 
     def build_trainer(self):
