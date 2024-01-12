@@ -34,8 +34,10 @@ class EsmForSequenceClassification(EsmPreTrainedModel):
         self.num_labels = config.num_labels
         self.config = config
 
-        self.protein_model = AutoModel.from_config(config)
+        self.protein_model = AutoModel.from_pretrained(config._name_or_path)
         self.classifier = EsmClassificationHead(config)
+
+        self.init_weights()
 
     @add_start_docstrings_to_model_forward(ESM_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
     def forward(

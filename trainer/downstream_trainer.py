@@ -71,4 +71,8 @@ class DownstreamTrainer(Trainer):
 
         optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
         self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
+        for param_group in self.optimizer.param_groups:
+            for name, param in self.model.named_parameters():
+                if param.requires_grad:
+                    print(f"Parameter name: {name}, Learning Rate: {param_group['lr']}")
         return self.optimizer

@@ -51,8 +51,8 @@ class ProteinTextCLIPForPretrain(PreTrainedModel):
         protein_model_config = config.protein_model_config
         text_model_config = config.text_model_config
 
-        self.protein_model = AutoModel.from_config(protein_model_config)
-        self.text_model = AutoModel.from_config(text_model_config)
+        self.protein_model = AutoModel.from_pretrained(protein_model_config._name_or_path)
+        self.text_model = AutoModel.from_pretrained(text_model_config._name_or_path)
 
         self.protein_projection = nn.Sequential(
             nn.Linear(protein_model_config.hidden_size, self.config.projection_dim),
@@ -141,8 +141,8 @@ class ProtSTForPretrain(PreTrainedModel):
         protein_model_config = config.protein_model_config
         text_model_config = config.text_model_config
 
-        self.protein_model = AutoModel.from_config(protein_model_config)
-        self.text_model = AutoModel.from_config(text_model_config)
+        self.protein_model = AutoModel.from_pretrained(protein_model_config._name_or_path)
+        self.text_model = AutoModel.from_pretrained(text_model_config._name_or_path)
         self.protein_projection = nn.Sequential(
             nn.Linear(protein_model_config.hidden_size, self.config.projection_dim),
             nn.ReLU(),
