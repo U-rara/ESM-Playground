@@ -2,9 +2,12 @@ from transformers import Trainer
 
 
 class CLIPPretrainTrainer(Trainer):
-    def __init__(self, run_config, **kwargs):
+    def __init__(self, **kwargs):
+        self.protein_model_fixed = kwargs.pop("protein_model_fixed", True)
+        self.text_model_fixed = kwargs.pop("text_model_fixed", True)
+        self.lr_ratio = kwargs.pop("lr_ratio", 0.1)
+        self.lr = kwargs.pop("lr", 5e-5)
         super().__init__(**kwargs)
-        self.run_config = run_config
 
     def create_optimizer(self):
         """
@@ -13,8 +16,16 @@ class CLIPPretrainTrainer(Trainer):
         We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
         Trainer's init through `optimizers`, or subclass and override this method in a subclass.
         """
+
+        if self.protein_model_fixed:
+            for param in self.model.protein_model.parameters():
+                param.requires_grad = False
+        if self.text_model_fixed:
+            for param in self.model.text_model.parameters():
+                param.requires_grad = False
+
         decay_parameters = self.get_decay_parameter_names(self.model)
-        if self.run_config.protein_model_fixed and self.run_config.text_model_fixed:
+        if self.protein_model_fixed and self.text_model_fixed:
             optimizer_grouped_parameters = [
                 {
                     "params": [
@@ -32,10 +43,10 @@ class CLIPPretrainTrainer(Trainer):
         else:
             ratio_parameters = []
 
-            if not self.run_config.protein_model_fixed:
-                ratio_parameters += [n for n, p in self.model.protein_encoder.named_parameters()]
-            if not self.run_config.text_model_fixed:
-                ratio_parameters += [n for n, p in self.model.text_encoder.named_parameters()]
+            if not self.protein_model_fixed:
+                ratio_parameters += [n for n, p in self.model.protein_model.named_parameters()]
+            if not self.text_model_fixed:
+                ratio_parameters += [n for n, p in self.model.text_model.named_parameters()]
 
             optimizer_grouped_parameters = [
                 {
@@ -44,7 +55,7 @@ class CLIPPretrainTrainer(Trainer):
                         (n in decay_parameters and n in ratio_parameters and p.requires_grad)
                     ],
                     "weight_decay": self.args.weight_decay,
-                    "lr": self.run_config.lr_ratio * self.run_config.lr
+                    "lr": self.lr_ratio * self.lr
                 },
                 {
                     "params": [
@@ -52,7 +63,7 @@ class CLIPPretrainTrainer(Trainer):
                         (n not in decay_parameters and n in ratio_parameters and p.requires_grad)
                     ],
                     "weight_decay": 0.0,
-                    "lr": self.run_config.lr_ratio * self.run_config.lr
+                    "lr": self.lr_ratio * self.lr
                 },
                 {
                     "params": [
