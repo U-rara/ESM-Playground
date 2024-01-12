@@ -12,11 +12,11 @@ from transformers.utils import add_start_docstrings_to_model_forward
 class EsmClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
 
-    def __init__(self, run_config):
+    def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(run_config.hidden_size, run_config.hidden_size)
-        self.dropout = nn.Dropout(run_config.hidden_dropout_prob)
-        self.out_proj = nn.Linear(run_config.hidden_size, run_config.num_labels)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
 
     def forward(self, features):
         x = features.mean(dim=1)
@@ -36,8 +36,6 @@ class EsmForSequenceClassification(EsmPreTrainedModel):
 
         self.protein_model = AutoModel.from_config(config)
         self.classifier = EsmClassificationHead(config)
-
-        self.init_weights()
 
     @add_start_docstrings_to_model_forward(ESM_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
     def forward(
@@ -70,7 +68,7 @@ class EsmForSequenceClassification(EsmPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        sequence_output = outputs[0]
+        sequence_output = outputs.last_hidden_state
         logits = self.classifier(sequence_output)
 
         loss = None

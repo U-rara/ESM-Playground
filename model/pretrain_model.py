@@ -243,8 +243,6 @@ class ProtSTForPretrain(PreTrainedModel):
         text_mmp_loss = cross_entropy(text_mmp_logits.view(-1, text_mmp_logits.shape[-1]),
                                       text_masked_labels.view(-1))
 
-        print(f"cl_loss: {cl_loss.item()}, protein_mlm_loss: {protein_mlm_loss.item()}, "
-              f"protein_mmp_loss: {protein_mmp_loss.item()}, text_mmp_loss: {text_mmp_loss.item()}")
         return {
             "loss": cl_loss + protein_mlm_loss + protein_mmp_loss + text_mmp_loss,
             "cl_loss": cl_loss,
