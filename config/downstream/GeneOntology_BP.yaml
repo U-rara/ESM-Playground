@@ -22,7 +22,7 @@ num_labels: 1943
 batch_size: 64
 num_epochs: 200
 lr: 5e-5
-weight_decay: 0
+weight_decay: 0.0
 fp16: True
 
 # eval
