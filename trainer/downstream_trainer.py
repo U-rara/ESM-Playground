@@ -2,9 +2,10 @@ from transformers import Trainer
 
 
 class DownstreamTrainer(Trainer):
-    def __init__(self, run_config, **kwargs):
+    def __init__(self, **kwargs):
+        self.protein_model_fixed = kwargs.pop("protein_model_fixed", True)
+        self.lr_ratio = kwargs.pop("lr_ratio", 0.1)
         super().__init__(**kwargs)
-        self.run_config = run_config
 
     def create_optimizer(self):
         """
@@ -13,8 +14,12 @@ class DownstreamTrainer(Trainer):
         We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
         Trainer's init through `optimizers`, or subclass and override this method in a subclass.
         """
+        if self.protein_model_fixed:
+            for param in self.model.protein_model.parameters():
+                param.requires_grad = False
+
         decay_parameters = self.get_decay_parameter_names(self.model)
-        if self.run_config.protein_model_fixed:
+        if self.protein_model_fixed:
             optimizer_grouped_parameters = [
                 {
                     "params": [
@@ -31,7 +36,6 @@ class DownstreamTrainer(Trainer):
             ]
         else:
             ratio_parameters = [n for n, p in self.model.encoder.named_parameters()]
-            print(ratio_parameters)
             optimizer_grouped_parameters = [
                 {
                     "params": [
@@ -39,7 +43,7 @@ class DownstreamTrainer(Trainer):
                         (n in decay_parameters and n in ratio_parameters and p.requires_grad)
                     ],
                     "weight_decay": self.args.weight_decay,
-                    "lr": self.run_config.lr_ratio * self.run_config.lr
+                    "lr": self.lr_ratio * self.args.learning_rate
                 },
                 {
                     "params": [
@@ -47,7 +51,7 @@ class DownstreamTrainer(Trainer):
                         (n not in decay_parameters and n in ratio_parameters and p.requires_grad)
                     ],
                     "weight_decay": 0.0,
-                    "lr": self.run_config.lr_ratio * self.run_config.lr
+                    "lr": self.lr_ratio * self.args.learning_rate
                 },
                 {
                     "params": [

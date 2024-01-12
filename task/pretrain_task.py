@@ -83,6 +83,7 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
             greater_is_better=False if self.run_config.metric_for_best_model in ["mae", "rmse", "loss"] else True,
             fp16=self.run_config.fp16,
             push_to_hub=False,
+            learning_rate=self.run_config.lr,
             report_to=["wandb"],
         )
 
@@ -100,7 +101,6 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
             protein_model_fixed=self.run_config.protein_model_fixed,
             text_model_fixed=self.run_config.text_model_fixed,
             lr_ratio=self.run_config.lr_ratio,
-            lr=self.run_config.lr,
         )
 
 

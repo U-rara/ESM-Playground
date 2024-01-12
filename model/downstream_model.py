@@ -3,7 +3,7 @@ from typing import Optional, Union, Tuple
 import torch
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss, BCEWithLogitsLoss
-from transformers import EsmPreTrainedModel
+from transformers import EsmPreTrainedModel, EsmModel, AutoModel
 from transformers.modeling_outputs import SequenceClassifierOutput
 from transformers.models.esm.modeling_esm import ESM_INPUTS_DOCSTRING
 from transformers.utils import add_start_docstrings_to_model_forward
@@ -18,7 +18,7 @@ class EsmClassificationHead(nn.Module):
         self.dropout = nn.Dropout(run_config.hidden_dropout_prob)
         self.out_proj = nn.Linear(run_config.hidden_size, run_config.num_labels)
 
-    def forward(self, features, **kwargs):
+    def forward(self, features):
         x = features.mean(dim=1)
         x = self.dropout(x)
         x = self.dense(x)
@@ -29,12 +29,12 @@ class EsmClassificationHead(nn.Module):
 
 
 class EsmForSequenceClassification(EsmPreTrainedModel):
-    def __init__(self, config, esm_model):
+    def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.config = config
 
-        self.encoder = esm_model
+        self.protein_model = AutoModel.from_config(config)
         self.classifier = EsmClassificationHead(config)
 
         self.init_weights()
@@ -60,7 +60,7 @@ class EsmForSequenceClassification(EsmPreTrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.encoder(
+        outputs = self.protein_model(
             input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,

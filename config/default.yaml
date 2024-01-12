@@ -2,7 +2,7 @@ hydra:
   run:
     dir: './outputs/${task_name}/${now:%Y-%m-%d_%H-%M-%S}'
 
-task_name: 'esm2_t33_650M_UR50D_ProtST'
+task_name: 'esm2_t33_650M_UR50D_EnzymeCommission'
 
 # path
 data_path: './database'
@@ -10,32 +10,23 @@ output_path: './outputs/${task_name}/${now:%Y-%m-%d_%H-%M-%S}'
 
 # model
 protein_model_name: '/root/tmp/ww/model/esm2_t33_650M_UR50D'
-protein_model_fixed: False
-text_model_name: '/root/tmp/ww/model/BiomedNLP-PubMedBERT-base-uncased-abstract'
-text_model_fixed: True
-projection_dim: 512
-fusion_num_heads: 8
-fusion_num_layers: 1
-fusion_batch_norm: True
-mlp_num_layers: 2
-mlm_probability: 0.15
-
-
+protein_model_fixed: True
+lr_ratio: 0.1
 
 # dataset
-dataset: 'Swissprot_Protst'
-max_length: 1022
+dataset: 'EnzymeCommission'
+max_length: 1024
+num_labels: 538
 
 # train
-lr: 1e-5
-lr_ratio: 0.1
+lr: 1e-4
 fp16: True
-batch_size: 3
-num_epochs: 35
+batch_size: 64
+num_epochs: 200
 weight_decay: 0
 
 # eval
-metric_for_best_model: 'loss'
+metric_for_best_model: 'f1_max'
 
 # task
-task: 'ProtSTPretrainTask'
+task: 'MultiLabelSequenceClassificationTask'

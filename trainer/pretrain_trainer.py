@@ -6,7 +6,6 @@ class CLIPPretrainTrainer(Trainer):
         self.protein_model_fixed = kwargs.pop("protein_model_fixed", True)
         self.text_model_fixed = kwargs.pop("text_model_fixed", True)
         self.lr_ratio = kwargs.pop("lr_ratio", 0.1)
-        self.lr = kwargs.pop("lr", 5e-5)
         super().__init__(**kwargs)
 
     def create_optimizer(self):
@@ -55,7 +54,7 @@ class CLIPPretrainTrainer(Trainer):
                         (n in decay_parameters and n in ratio_parameters and p.requires_grad)
                     ],
                     "weight_decay": self.args.weight_decay,
-                    "lr": self.lr_ratio * self.lr
+                    "lr": self.lr_ratio * self.args.learning_rate
                 },
                 {
                     "params": [
@@ -63,7 +62,7 @@ class CLIPPretrainTrainer(Trainer):
                         (n not in decay_parameters and n in ratio_parameters and p.requires_grad)
                     ],
                     "weight_decay": 0.0,
-                    "lr": self.lr_ratio * self.lr
+                    "lr": self.lr_ratio * self.args.learning_rate
                 },
                 {
                     "params": [
