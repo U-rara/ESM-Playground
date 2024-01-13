@@ -85,7 +85,8 @@ class SingleLabelSequenceClassificationTask(DownstreamTask):
         super().__init__(run_config)
 
     def build_task_model(self):
-        return EsmForSequenceClassification(AutoConfig.from_pretrained(self.run_config.protein_model_name))
+        return EsmForSequenceClassification(
+            AutoConfig.from_pretrained(self.run_config.protein_model_name, num_labels=self.run_config.num_labels))
 
     def compute_metrics(self, eval_pred):
         predictions, labels = eval_pred
