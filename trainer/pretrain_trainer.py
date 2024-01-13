@@ -1,3 +1,4 @@
+from accelerate.utils import DummyOptim
 from peft import PeftModel
 from transformers import Trainer
 from transformers.modeling_utils import unwrap_model
@@ -28,6 +29,14 @@ class CLIPPretrainTrainer(Trainer):
                 param.requires_grad = False
 
         decay_parameters = self.get_decay_parameter_names(self.model)
+
+        ratio_parameters = [self.model.logit_scale]
+
+        if not self.protein_model_fixed:
+            ratio_parameters += [n for n, p in self.model.protein_model.named_parameters()]
+        if not self.text_model_fixed:
+            ratio_parameters += [n for n, p in self.model.text_model.named_parameters()]
+
         if self.protein_model_fixed and self.text_model_fixed:
             optimizer_grouped_parameters = [
                 {
@@ -44,13 +53,6 @@ class CLIPPretrainTrainer(Trainer):
                 },
             ]
         else:
-            ratio_parameters = []
-
-            if not self.protein_model_fixed:
-                ratio_parameters += [n for n, p in self.model.protein_model.named_parameters()]
-            if not self.text_model_fixed:
-                ratio_parameters += [n for n, p in self.model.text_model.named_parameters()]
-
             optimizer_grouped_parameters = [
                 {
                     "params": [
@@ -85,11 +87,10 @@ class CLIPPretrainTrainer(Trainer):
             ]
 
         optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
-        self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
-        for param_group in self.optimizer.param_groups:
-            for name, param in self.model.named_parameters():
-                if param.requires_grad:
-                    print(f"Parameter name: {name}, Learning Rate: {param_group['lr']}")
+        if self.is_deepspeed_enabled:
+            self.optimizer = DummyOptim(optimizer_grouped_parameters, **optimizer_kwargs)
+        else:
+            self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
         return self.optimizer
 
     def compute_loss(self, model, inputs, return_outputs=False):

@@ -1,21 +1,12 @@
-import accelerate.utils
-import numpy as np
 import torch
+import numpy as np
 import torch.nn as nn
+from torch.distributed import get_rank, get_world_size
+from torch.distributed.nn.functional import all_gather
 from torch.nn.functional import cross_entropy
 from transformers import PreTrainedModel, PretrainedConfig, AutoConfig, AutoModel
 
-from model.layers import CrossAttention
-
-
-def contrastive_loss(logits: torch.Tensor) -> torch.Tensor:
-    return cross_entropy(logits, torch.arange(len(logits), device=logits.device))
-
-
-def clip_loss(similarity: torch.Tensor) -> torch.Tensor:
-    protein_loss = contrastive_loss(similarity)
-    text_loss = contrastive_loss(similarity.t())
-    return (protein_loss + text_loss) / 2.0
+from model.layers import CrossAttention, CLIPLoss
 
 
 class ProteinTextCLIPConfig(PretrainedConfig):
@@ -82,17 +73,16 @@ class ProteinTextCLIPForPretrain(PreTrainedModel):
         protein_embeds = protein_embeds / protein_embeds.norm(dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
 
-        protein_embeds = accelerate.utils.gather(protein_embeds)
-        text_embeds = accelerate.utils.gather(text_embeds)
+        cl_loss = CLIPLoss(
+            local_loss=False,
+            gather_with_grad=True,
+            cache_labels=True,
+            rank=get_rank(),
+            world_size=get_world_size()
+        )(protein_embeds, text_embeds, self.logit_scale.exp())
 
-        # cosine similarity as logits
-        logit_scale = self.logit_scale.exp()
-        logits_per_protein = logit_scale * protein_embeds @ text_embeds.t()
-
-        # compute the loss
-        loss = clip_loss(logits_per_protein)
         return {
-            "loss": loss,
+            "loss": cl_loss
         }
 
 
@@ -211,15 +201,13 @@ class ProtSTForPretrain(PreTrainedModel):
         protein_embeds = protein_embeds / protein_embeds.norm(dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
 
-        protein_embeds = accelerate.utils.gather(protein_embeds)
-        text_embeds = accelerate.utils.gather(text_embeds)
-
-        # cosine similarity as logits
-        logit_scale = self.logit_scale.exp()
-        logits_per_protein = logit_scale * protein_embeds @ text_embeds.t()
-
-        # compute the clip loss
-        cl_loss = clip_loss(logits_per_protein)
+        cl_loss = CLIPLoss(
+            local_loss=False,
+            gather_with_grad=True,
+            cache_labels=True,
+            rank=get_rank(),
+            world_size=get_world_size()
+        )(protein_embeds, text_embeds, self.logit_scale.exp())
 
         # compute outputs
         protein_outputs = self.protein_model(input_ids=protein_masked_input_ids,
