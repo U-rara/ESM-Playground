@@ -36,7 +36,7 @@ class DownstreamTrainer(Trainer):
                 },
             ]
         else:
-            ratio_parameters = [n for n, p in self.model.encoder.named_parameters()]
+            ratio_parameters = [n for n, p in self.model.protein_model.named_parameters()]
             optimizer_grouped_parameters = [
                 {
                     "params": [
