@@ -71,8 +71,5 @@ class DownstreamTrainer(Trainer):
             ]
 
         optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
-        if self.is_deepspeed_enabled:
-            self.optimizer = DummyOptim(optimizer_grouped_parameters, **optimizer_kwargs)
-        else:
-            self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
+        self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
         return self.optimizer
