@@ -82,7 +82,8 @@ class ProteinTextCLIPForPretrain(PreTrainedModel):
         )(protein_embeds, text_embeds, self.logit_scale.exp())
 
         return {
-            "loss": cl_loss
+            "loss": cl_loss,
+            "cl_loss": cl_loss
         }
 
 
