@@ -1,5 +1,6 @@
 from datasets import load_dataset
 from transformers import TrainingArguments, EarlyStoppingCallback, AutoConfig, AutoTokenizer
+
 from model.pretrain_model import ProteinTextCLIPForPretrain, ProtSTForPretrain, ProteinTextCLIPConfig, ProtSTConfig
 from trainer.pretrain_trainer import CLIPPretrainTrainer
 from utils import DataCollatorForProteinTextCLIPPretrain
@@ -84,6 +85,7 @@ class ProteinTextCLIPPretrainTask(PretrainTask):
             learning_rate=self.run_config.lr,
             report_to=["wandb"],
             warmup_ratio=self.run_config.warmup_ratio,
+            load_best_model_at_end=True
         )
 
     def build_trainer(self):
